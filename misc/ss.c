@@ -106,22 +106,22 @@ static int security_get_initial_context(char *name,  char **context)
 }
 #endif
 
-static int resolve_services = 1;
+static int resolve_services = 0;
 int preferred_family = AF_UNSPEC;
 static int show_options;
 int show_details;
-static int show_users;
-static int show_mem;
-static int show_tcpinfo;
+static int show_users = 1;
+static int show_mem = 1;
+static int show_tcpinfo = 1;
 static int show_bpf;
-static int show_proc_ctx;
-static int show_sock_ctx;
-static int show_header = 1;
+static int show_proc_ctx = 0;
+static int show_sock_ctx = 0;
+static int show_header = 0;
 static int follow_events;
 static int sctp_ino;
 static int show_tipcinfo;
 static int show_tos;
-int oneline;
+int oneline = 1;
 
 enum col_id {
 	COL_NETID,
@@ -704,18 +704,18 @@ static int find_entry(unsigned int ino, char **buf, int type)
 			switch (type) {
 			case USERS:
 				len = snprintf(ptr, buf_len - buf_used,
-					"(\"%s\",pid=%d,fd=%d),",
+					"{\"name\": \"%s\", \"pid\": %d, \"fd\": %d},",
 					p->process, p->pid, p->fd);
 				break;
 			case PROC_CTX:
 				len = snprintf(ptr, buf_len - buf_used,
-					"(\"%s\",pid=%d,proc_ctx=%s,fd=%d),",
+					"{\"name\": \"%s\", \"pid\": %d, \"proc_ctx\": \"%s\", \"fd\": %d},",
 					p->process, p->pid,
 					p->process_ctx, p->fd);
 				break;
 			case PROC_SOCK_CTX:
 				len = snprintf(ptr, buf_len - buf_used,
-					"(\"%s\",pid=%d,proc_ctx=%s,fd=%d,sock_ctx=%s),",
+					"{\"name\": \"%s\", \"pid\": %d, \"proc_ctx\": \"%s\", \"fd\": %d, \"sock_ctx\": \"%s\"},",
 					p->process, p->pid,
 					p->process_ctx, p->fd,
 					p->socket_ctx);
@@ -1302,7 +1302,7 @@ static void field_next(void)
 		return;
 	}
 
-	field_flush(current_field);
+	//field_flush(current_field);
 	if (field_is_last(current_field))
 		current_field = columns;
 	else
@@ -1378,23 +1378,23 @@ static void sock_state_print(struct sockstat *s)
 		field_set(COL_NETID);
 		out("%s", sock_name);
 		field_set(COL_STATE);
-		out("%s", sstate_name[s->state]);
+		out("{\"state\": \"%s\", ", sstate_name[s->state]);
 	}
 
-	field_set(COL_RECVQ);
-	out("%-6d", s->rq);
-	field_set(COL_SENDQ);
-	out("%-6d", s->wq);
-	field_set(COL_ADDR);
+	//field_set(COL_RECVQ);
+	out("\"recvq\": %d, ", s->rq);
+	//field_set(COL_SENDQ);
+	out("\"sendq\": %d, ", s->wq);
+	//field_set(COL_ADDR);
 }
 
 static void sock_details_print(struct sockstat *s)
 {
 	if (s->uid)
-		out(" uid:%u", s->uid);
+		out("\"uid\": %u, ", s->uid);
 
-	out(" ino:%u", s->ino);
-	out(" sk:%llx", s->sk);
+	out("\"ino\": %u, ", s->ino);
+	out("\"sk\": %llu, ", s->sk);
 
 	if (s->mark)
 		out(" fwmark:0x%x", s->mark);
@@ -1404,12 +1404,12 @@ static void sock_addr_print(const char *addr, char *delim, const char *port,
 		const char *ifname)
 {
 	if (ifname)
-		out("%s" "%%" "%s%s", addr, ifname, delim);
+		out("\"addr\": \"%s\", \"interface\": \"%s\", ", addr, ifname);
 	else
-		out("%s%s", addr, delim);
+		out("\"addr\": \"%s\", ", addr);
 
 	field_next();
-	out("%s", port);
+	out("\"port\": \"%s\"", port);
 	field_next();
 }
 
@@ -2289,12 +2289,12 @@ static void proc_ctx_print(struct sockstat *s)
 		if (find_entry(s->ino, &buf,
 				(show_proc_ctx & show_sock_ctx) ?
 				PROC_SOCK_CTX : PROC_CTX) > 0) {
-			out(" users:(%s)", buf);
+			out("\"users\": [%s], ", buf);
 			free(buf);
 		}
 	} else if (show_users) {
 		if (find_entry(s->ino, &buf, USERS) > 0) {
-			out(" users:(%s)", buf);
+			out("\"users\": [%s], ", buf);
 			free(buf);
 		}
 	}
@@ -2304,8 +2304,12 @@ static void inet_stats_print(struct sockstat *s, bool v6only)
 {
 	sock_state_print(s);
 
+    out("\"local\": {");
 	inet_addr_print(&s->local, s->lport, s->iface, v6only);
+    out("}, ");
+    out("\"remote\": {");
 	inet_addr_print(&s->remote, s->rport, 0, v6only);
+    out("}, ");
 
 	proc_ctx_print(s);
 }
@@ -2426,71 +2430,75 @@ static void tcp_stats_print(struct tcpstat *s)
 	char b1[64];
 
 	if (s->has_ts_opt)
-		out(" ts");
+		out("\"ts\": true, ");
 	if (s->has_sack_opt)
-		out(" sack");
+		out("\"sack\": true, ");
 	if (s->has_ecn_opt)
-		out(" ecn");
+		out("\"ecn\": true, ");
 	if (s->has_ecnseen_opt)
-		out(" ecnseen");
+		out("\"ecnseen\": true, ");
 	if (s->has_fastopen_opt)
-		out(" fastopen");
+		out("\"fastopen\": true, ");
 	if (s->cong_alg[0])
-		out(" %s", s->cong_alg);
-	if (s->has_wscale_opt)
-		out(" wscale:%d,%d", s->snd_wscale, s->rcv_wscale);
+		out("\"cong_alg\": \"%s\", ", s->cong_alg);
+	if (s->has_wscale_opt) {
+		out("\"snd_wscale\": %d, ", s->rcv_wscale);
+		out("\"rcv_wscale\": %d, ", s->snd_wscale);
+    }
 	if (s->rto)
-		out(" rto:%g", s->rto);
+		out("\"rto\": %g, ", s->rto);
 	if (s->backoff)
-		out(" backoff:%u", s->backoff);
-	if (s->rtt)
-		out(" rtt:%g/%g", s->rtt, s->rttvar);
+		out("\"backoff\": %u, ", s->backoff);
+	if (s->rtt) {
+		out("\"rtt\": %g, ", s->rtt);
+		out("\"rttvar\": %g, ", s->rttvar);
+    }
 	if (s->ato)
-		out(" ato:%g", s->ato);
+		out("\"ato\": %g, ", s->ato);
 
 	if (s->qack)
-		out(" qack:%d", s->qack);
+		out("\"qack\": %d, ", s->qack);
 	if (s->qack & 1)
-		out(" bidir");
+		out("\"bidir\": true, ");
 
 	if (s->mss)
-		out(" mss:%d", s->mss);
+		out("\"mss\": %d, ", s->mss);
 	if (s->pmtu)
-		out(" pmtu:%u", s->pmtu);
+		out("\"pmtu\": %u, ", s->pmtu);
 	if (s->rcv_mss)
-		out(" rcvmss:%d", s->rcv_mss);
+		out("\"rcvmss\": %d, ", s->rcv_mss);
 	if (s->advmss)
-		out(" advmss:%d", s->advmss);
+		out("\"advmss\": %d, ", s->advmss);
 	if (s->cwnd)
-		out(" cwnd:%u", s->cwnd);
+		out("\"cwnd\": %u, ", s->cwnd);
 	if (s->ssthresh)
-		out(" ssthresh:%d", s->ssthresh);
+		out("\"ssthresh\": %d, ", s->ssthresh);
 
 	if (s->bytes_sent)
-		out(" bytes_sent:%llu", s->bytes_sent);
+		out("\"bytes_sent\": %llu, ", s->bytes_sent);
 	if (s->bytes_retrans)
-		out(" bytes_retrans:%llu", s->bytes_retrans);
+		out("\"bytes_retrans\": %llu, ", s->bytes_retrans);
 	if (s->bytes_acked)
-		out(" bytes_acked:%llu", s->bytes_acked);
+		out("\"bytes_acked\": %llu, ", s->bytes_acked);
 	if (s->bytes_received)
-		out(" bytes_received:%llu", s->bytes_received);
+		out("\"bytes_received\": %llu, ", s->bytes_received);
 	if (s->segs_out)
-		out(" segs_out:%u", s->segs_out);
+		out("\"segs_out\": %u, ", s->segs_out);
 	if (s->segs_in)
-		out(" segs_in:%u", s->segs_in);
+		out("\"segs_in\": %u, ", s->segs_in);
 	if (s->data_segs_out)
-		out(" data_segs_out:%u", s->data_segs_out);
+		out("\"data_segs_out\": %u, ", s->data_segs_out);
 	if (s->data_segs_in)
-		out(" data_segs_in:%u", s->data_segs_in);
+		out("\"data_segs_in\": %u, ", s->data_segs_in);
 
 	if (s->dctcp && s->dctcp->enabled) {
 		struct dctcpstat *dctcp = s->dctcp;
 
-		out(" dctcp:(ce_state:%u,alpha:%u,ab_ecn:%u,ab_tot:%u)",
+		out("\"dctcp\": (ce_state:%u,alpha:%u,ab_ecn:%u,ab_tot:%u), ",
 			     dctcp->ce_state, dctcp->alpha, dctcp->ab_ecn,
 			     dctcp->ab_tot);
 	} else if (s->dctcp) {
-		out(" dctcp:fallback_mode");
+		out("\"dctcp\": fallback_mode, ");
 	}
 
 	if (s->bbr_info) {
@@ -2500,7 +2508,7 @@ static void tcp_stats_print(struct tcpstat *s)
 		bw <<= 32;
 		bw |= s->bbr_info->bbr_bw_lo;
 
-		out(" bbr:(bw:%sbps,mrtt:%g",
+		out("\"bbr\": (bw:%sbps,mrtt:%g, ",
 		    sprint_bw(b1, bw * 8.0),
 		    (double)s->bbr_info->bbr_min_rtt / 1000.0);
 		if (s->bbr_info->bbr_pacing_gain)
@@ -2513,67 +2521,72 @@ static void tcp_stats_print(struct tcpstat *s)
 	}
 
 	if (s->send_bps)
-		out(" send %sbps", sprint_bw(b1, s->send_bps));
+		out("\"send\": %.0f, ", s->send_bps);
 	if (s->lastsnd)
-		out(" lastsnd:%u", s->lastsnd);
+		out("\"lastsnd\": %u, ", s->lastsnd);
 	if (s->lastrcv)
-		out(" lastrcv:%u", s->lastrcv);
+		out("\"lastrcv\": %u, ", s->lastrcv);
 	if (s->lastack)
-		out(" lastack:%u", s->lastack);
+		out("\"lastack\": %u, ", s->lastack);
 
 	if (s->pacing_rate) {
-		out(" pacing_rate %sbps", sprint_bw(b1, s->pacing_rate));
-		if (s->pacing_rate_max)
-			out("/%sbps", sprint_bw(b1, s->pacing_rate_max));
+		out("\"pacing_rate\": %.0f, ", s->pacing_rate);
+		if (s->pacing_rate_max) {
+			out("\"pacing_rate_max\": %.0f, ", s->pacing_rate_max);
+        }
 	}
 
 	if (s->delivery_rate)
-		out(" delivery_rate %sbps", sprint_bw(b1, s->delivery_rate));
+		out("\"delivery_rate\": %.0f, ", s->delivery_rate);
 	if (s->delivered)
-		out(" delivered:%u", s->delivered);
+		out("\"delivered\": %u, ", s->delivered);
 	if (s->delivered_ce)
-		out(" delivered_ce:%u", s->delivered_ce);
+		out("\"delivered_ce\": %u, ", s->delivered_ce);
 	if (s->app_limited)
-		out(" app_limited");
+		out("\"app_limited\": true, ");
 
 	if (s->busy_time) {
-		out(" busy:%llums", s->busy_time / 1000);
-		if (s->rwnd_limited)
-			out(" rwnd_limited:%llums(%.1f%%)",
-			    s->rwnd_limited / 1000,
-			    100.0 * s->rwnd_limited / s->busy_time);
-		if (s->sndbuf_limited)
-			out(" sndbuf_limited:%llums(%.1f%%)",
-			    s->sndbuf_limited / 1000,
-			    100.0 * s->sndbuf_limited / s->busy_time);
+		out("\"busy\": %llu, ", s->busy_time / 1000);
+		if (s->rwnd_limited) {
+			out("\"rwnd_limited\": %llu, ", s->rwnd_limited / 1000);
+			out("\"rwnd_limited_pct\": %.1f%%, ", 100.0 * s->rwnd_limited / s->busy_time);
+        }
+		if (s->sndbuf_limited) {
+			out("\"sndbuf_limited\": %llu, ", s->sndbuf_limited / 1000);
+			out("\"sndbuf_limited_pct\": %.1f%%, ", 100.0 * s->sndbuf_limited / s->busy_time);
+        }
 	}
 
 	if (s->unacked)
-		out(" unacked:%u", s->unacked);
-	if (s->retrans || s->retrans_total)
-		out(" retrans:%u/%u", s->retrans, s->retrans_total);
+		out("\"unacked\": %u, ", s->unacked);
+	if (s->retrans || s->retrans_total) {
+		out("\"retrans\": %u, ", s->retrans);
+		out("\"retrans_total\": %u, ", s->retrans_total);
+    }
 	if (s->lost)
-		out(" lost:%u", s->lost);
+		out("\"lost\": %u, ", s->lost);
 	if (s->sacked && s->ss.state != SS_LISTEN)
-		out(" sacked:%u", s->sacked);
+		out("\"sacked\": %u, ", s->sacked);
 	if (s->dsack_dups)
-		out(" dsack_dups:%u", s->dsack_dups);
+		out("\"dsack_dups\": %u, ", s->dsack_dups);
 	if (s->fackets)
-		out(" fackets:%u", s->fackets);
+		out("\"fackets\": %u, ", s->fackets);
 	if (s->reordering != 3)
-		out(" reordering:%d", s->reordering);
+		out("\"reordering\": %d, ", s->reordering);
 	if (s->reord_seen)
-		out(" reord_seen:%d", s->reord_seen);
+		out("\"reord_seen\": %d, ", s->reord_seen);
 	if (s->rcv_rtt)
-		out(" rcv_rtt:%g", s->rcv_rtt);
+		out("\"rcv_rtt\": %g, ", s->rcv_rtt);
 	if (s->rcv_space)
-		out(" rcv_space:%d", s->rcv_space);
+		out("\"rcv_space\": %d, ", s->rcv_space);
 	if (s->rcv_ssthresh)
-		out(" rcv_ssthresh:%u", s->rcv_ssthresh);
+		out("\"rcv_ssthresh\": %u, ", s->rcv_ssthresh);
 	if (s->not_sent)
-		out(" notsent:%u", s->not_sent);
+		out("\"notsent\": %u, ", s->not_sent);
 	if (s->min_rtt)
-		out(" minrtt:%g", s->min_rtt);
+		out("\"minrtt\": %g, ", s->min_rtt);
+
+    out("}\n");
 }
 
 static void tcp_timer_print(struct tcpstat *s)
@@ -2590,9 +2603,9 @@ static void tcp_timer_print(struct tcpstat *s)
 	if (s->timer) {
 		if (s->timer > 4)
 			s->timer = 5;
-		out(" timer:(%s,%s,%d)",
+		out("\"timer\": {\"type\": \"%s\", \"time\": %u, \"retrans\": %d}, ",
 			     tmr_name[s->timer],
-			     print_ms_timer(s->timeout),
+			     s->timeout,
 			     s->retrans);
 	}
 }
@@ -2719,7 +2732,7 @@ static void print_skmeminfo(struct rtattr *tb[], int attrtype)
 
 	skmeminfo = RTA_DATA(tb[attrtype]);
 
-	out(" skmem:(r%u,rb%u,t%u,tb%u,f%u,w%u,o%u",
+	out("\"skmem\": {\"rmem_alloc\": %u, \"rcvbuf\": %u, \"wmem_alloc\": %u, \"sndbuf\": %u, \"fwd_alloc\": %u, \"wmem_queued\": %u, \"optmem\": %u}, ",
 		     skmeminfo[SK_MEMINFO_RMEM_ALLOC],
 		     skmeminfo[SK_MEMINFO_RCVBUF],
 		     skmeminfo[SK_MEMINFO_WMEM_ALLOC],
@@ -3039,8 +3052,7 @@ static int inet_show_sock(struct nlmsghdr *nlh,
 			unsigned char mask;
 
 			mask = rta_getattr_u8(tb[INET_DIAG_SHUTDOWN]);
-			out(" %c-%c",
-			    mask & 1 ? '-' : '<', mask & 2 ? '-' : '>');
+			//out(" %c-%c", mask & 1 ? '-' : '<', mask & 2 ? '-' : '>');
 		}
 	}
 
@@ -5035,230 +5047,20 @@ static const struct option long_opts[] = {
 
 };
 
-int main(int argc, char *argv[])
+int main()
 {
-	int saw_states = 0;
-	int saw_query = 0;
-	int do_summary = 0;
 	const char *dump_tcpdiag = NULL;
 	FILE *filter_fp = NULL;
-	int ch;
-	int state_filter = 0;
 
-	while ((ch = getopt_long(argc, argv,
-				 "dhaletuwxnro460spbEf:miA:D:F:vVzZN:KHSO",
-				 long_opts, NULL)) != EOF) {
-		switch (ch) {
-		case 'n':
-			resolve_services = 0;
-			break;
-		case 'r':
-			resolve_hosts = 1;
-			break;
-		case 'o':
-			show_options = 1;
-			break;
-		case 'e':
-			show_options = 1;
-			show_details++;
-			break;
-		case 'm':
-			show_mem = 1;
-			break;
-		case 'i':
-			show_tcpinfo = 1;
-			break;
-		case 'p':
-			show_users++;
-			user_ent_hash_build();
-			break;
-		case 'b':
-			show_options = 1;
-			show_bpf++;
-			break;
-		case 'E':
-			follow_events = 1;
-			break;
-		case 'd':
-			filter_db_set(&current_filter, DCCP_DB, true);
-			break;
-		case 't':
-			filter_db_set(&current_filter, TCP_DB, true);
-			break;
-		case 'S':
-			filter_db_set(&current_filter, SCTP_DB, true);
-			break;
-		case 'u':
-			filter_db_set(&current_filter, UDP_DB, true);
-			break;
-		case 'w':
-			filter_db_set(&current_filter, RAW_DB, true);
-			break;
-		case 'x':
-			filter_af_set(&current_filter, AF_UNIX);
-			break;
-		case OPT_VSOCK:
-			filter_af_set(&current_filter, AF_VSOCK);
-			break;
-		case OPT_TIPCSOCK:
-			filter_af_set(&current_filter, AF_TIPC);
-			break;
-		case 'a':
-			state_filter = SS_ALL;
-			break;
-		case 'l':
-			state_filter = (1 << SS_LISTEN) | (1 << SS_CLOSE);
-			break;
-		case '4':
-			filter_af_set(&current_filter, AF_INET);
-			break;
-		case '6':
-			filter_af_set(&current_filter, AF_INET6);
-			break;
-		case '0':
-			filter_af_set(&current_filter, AF_PACKET);
-			break;
-		case OPT_XDPSOCK:
-			filter_af_set(&current_filter, AF_XDP);
-			break;
-		case 'f':
-			if (strcmp(optarg, "inet") == 0)
-				filter_af_set(&current_filter, AF_INET);
-			else if (strcmp(optarg, "inet6") == 0)
-				filter_af_set(&current_filter, AF_INET6);
-			else if (strcmp(optarg, "link") == 0)
-				filter_af_set(&current_filter, AF_PACKET);
-			else if (strcmp(optarg, "unix") == 0)
-				filter_af_set(&current_filter, AF_UNIX);
-			else if (strcmp(optarg, "netlink") == 0)
-				filter_af_set(&current_filter, AF_NETLINK);
-			else if (strcmp(optarg, "tipc") == 0)
-				filter_af_set(&current_filter, AF_TIPC);
-			else if (strcmp(optarg, "vsock") == 0)
-				filter_af_set(&current_filter, AF_VSOCK);
-			else if (strcmp(optarg, "xdp") == 0)
-				filter_af_set(&current_filter, AF_XDP);
-			else if (strcmp(optarg, "help") == 0)
-				help();
-			else {
-				fprintf(stderr, "ss: \"%s\" is invalid family\n",
-						optarg);
-				usage();
-			}
-			break;
-		case 'A':
-		{
-			char *p, *p1;
+    filter_db_set(&current_filter, TCP_DB, true);
 
-			if (!saw_query) {
-				current_filter.dbs = 0;
-				state_filter = state_filter ?
-					       state_filter : SS_CONN;
-				saw_query = 1;
-				do_default = 0;
-			}
-			p = p1 = optarg;
-			do {
-				if ((p1 = strchr(p, ',')) != NULL)
-					*p1 = 0;
-				if (filter_db_parse(&current_filter, p)) {
-					fprintf(stderr, "ss: \"%s\" is illegal socket table id\n", p);
-					usage();
-				}
-				p = p1 + 1;
-			} while (p1);
-			break;
-		}
-		case 's':
-			do_summary = 1;
-			break;
-		case 'D':
-			dump_tcpdiag = optarg;
-			break;
-		case 'F':
-			if (filter_fp) {
-				fprintf(stderr, "More than one filter file\n");
-				exit(-1);
-			}
-			if (optarg[0] == '-')
-				filter_fp = stdin;
-			else
-				filter_fp = fopen(optarg, "r");
-			if (!filter_fp) {
-				perror("fopen filter file");
-				exit(-1);
-			}
-			break;
-		case 'v':
-		case 'V':
-			printf("ss utility, iproute2-ss%s\n", SNAPSHOT);
-			exit(0);
-		case 'z':
-			show_sock_ctx++;
-			/* fall through */
-		case 'Z':
-			if (is_selinux_enabled() <= 0) {
-				fprintf(stderr, "ss: SELinux is not enabled.\n");
-				exit(1);
-			}
-			show_proc_ctx++;
-			user_ent_hash_build();
-			break;
-		case 'N':
-			if (netns_switch(optarg))
-				exit(1);
-			break;
-		case OPT_TIPCINFO:
-			show_tipcinfo = 1;
-			break;
-		case OPT_TOS:
-			show_tos = 1;
-			break;
-		case 'K':
-			current_filter.kill = 1;
-			break;
-		case 'H':
-			show_header = 0;
-			break;
-		case 'O':
-			oneline = 1;
-			break;
-		case 'h':
-			help();
-		case '?':
-		default:
-			usage();
-		}
-	}
+    resolve_hosts = 0;
+    user_ent_hash_build();
 
-	argc -= optind;
-	argv += optind;
-
-	if (do_summary) {
-		print_summary();
-		if (do_default && argc == 0)
-			exit(0);
-	}
-
-	while (argc > 0) {
-		if (strcmp(*argv, "state") == 0) {
-			NEXT_ARG();
-			if (!saw_states)
-				state_filter = 0;
-			state_filter |= scan_state(*argv);
-			saw_states = 1;
-		} else if (strcmp(*argv, "exclude") == 0 ||
-			   strcmp(*argv, "excl") == 0) {
-			NEXT_ARG();
-			if (!saw_states)
-				state_filter = SS_ALL;
-			state_filter &= ~scan_state(*argv);
-			saw_states = 1;
-		} else {
-			break;
-		}
-		argc--; argv++;
-	}
+    int state_filter =
+        scan_state("connected")
+        & ~scan_state("close-wait")
+        & ~scan_state("fin-wait-1");
 
 	if (do_default) {
 		state_filter = state_filter ? state_filter : SS_CONN;
@@ -5304,7 +5106,7 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
-	if (ssfilter_parse(&current_filter.f, argc, argv, filter_fp))
+	if (ssfilter_parse(&current_filter.f, 0, NULL, filter_fp))
 		usage();
 
 	if (!(current_filter.dbs & (current_filter.dbs - 1)))
