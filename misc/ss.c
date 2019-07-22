@@ -2733,7 +2733,7 @@ static void print_skmeminfo(struct rtattr *tb[], int attrtype)
 
 	skmeminfo = RTA_DATA(tb[attrtype]);
 
-	out("\"skmem\": {\"rmem_alloc\": %u, \"rcvbuf\": %u, \"wmem_alloc\": %u, \"sndbuf\": %u, \"fwd_alloc\": %u, \"wmem_queued\": %u, \"optmem\": %u}, ",
+	out("\"skmem\": {\"rmem_alloc\": %u, \"rcvbuf\": %u, \"wmem_alloc\": %u, \"sndbuf\": %u, \"fwd_alloc\": %u, \"wmem_queued\": %u, \"optmem\": %u, ",
 		     skmeminfo[SK_MEMINFO_RMEM_ALLOC],
 		     skmeminfo[SK_MEMINFO_RCVBUF],
 		     skmeminfo[SK_MEMINFO_WMEM_ALLOC],
@@ -2744,13 +2744,13 @@ static void print_skmeminfo(struct rtattr *tb[], int attrtype)
 
 	if (RTA_PAYLOAD(tb[attrtype]) >=
 		(SK_MEMINFO_BACKLOG + 1) * sizeof(__u32))
-		out(",bl%u", skmeminfo[SK_MEMINFO_BACKLOG]);
+		out("\"backlog\": %u, ", skmeminfo[SK_MEMINFO_BACKLOG]);
 
 	if (RTA_PAYLOAD(tb[attrtype]) >=
 		(SK_MEMINFO_DROPS + 1) * sizeof(__u32))
-		out(",d%u", skmeminfo[SK_MEMINFO_DROPS]);
+		out("\"drops\": %u, ", skmeminfo[SK_MEMINFO_DROPS]);
 
-	out(")");
+	out("}, ");
 }
 
 static void print_md5sig(struct tcp_diag_md5sig *sig)
