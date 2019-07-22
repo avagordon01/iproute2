@@ -2494,9 +2494,12 @@ static void tcp_stats_print(struct tcpstat *s)
 	if (s->dctcp && s->dctcp->enabled) {
 		struct dctcpstat *dctcp = s->dctcp;
 
-		out("\"dctcp\": (ce_state:%u,alpha:%u,ab_ecn:%u,ab_tot:%u), ",
-			     dctcp->ce_state, dctcp->alpha, dctcp->ab_ecn,
-			     dctcp->ab_tot);
+        out("\"dctcp: {\"");
+        out("\"ce_state\": %u, ", dctcp->ce_state);
+        out("\"alpha\": %u, ", dctcp->alpha);
+        out("\"ab_ecn\": %u, ", dctcp->ab_ecn);
+        out("\"ab_tot\": %u", dctcp->ab_tot);
+        out("}, ");
 	} else if (s->dctcp) {
 		out("\"dctcp\": fallback_mode, ");
 	}
@@ -2508,16 +2511,14 @@ static void tcp_stats_print(struct tcpstat *s)
 		bw <<= 32;
 		bw |= s->bbr_info->bbr_bw_lo;
 
-		out("\"bbr\": (bw:%sbps,mrtt:%g, ",
-		    sprint_bw(b1, bw * 8.0),
-		    (double)s->bbr_info->bbr_min_rtt / 1000.0);
+        out("\"bbr\": {");
+		out("\"bw\": %llu, ", bw);
+        out("\"mrtt\": %u, ", s->bbr_info->bbr_min_rtt);
 		if (s->bbr_info->bbr_pacing_gain)
-			out(",pacing_gain:%g",
-			    (double)s->bbr_info->bbr_pacing_gain / 256.0);
+			out("\"pacing_gain\": %u, ", s->bbr_info->bbr_pacing_gain);
 		if (s->bbr_info->bbr_cwnd_gain)
-			out(",cwnd_gain:%g",
-			    (double)s->bbr_info->bbr_cwnd_gain / 256.0);
-		out(")");
+			out("\"cwnd_gain\": %u, ", s->bbr_info->bbr_cwnd_gain);
+        out("}, ");
 	}
 
 	if (s->send_bps)
