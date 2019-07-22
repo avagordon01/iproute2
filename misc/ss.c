@@ -5123,33 +5123,37 @@ int main()
 	if (follow_events)
 		exit(handle_follow_request(&current_filter));
 
-	if (current_filter.dbs & (1<<NETLINK_DB))
-		netlink_show(&current_filter);
-	if (current_filter.dbs & PACKET_DBM)
-		packet_show(&current_filter);
-	if (current_filter.dbs & UNIX_DBM)
-		unix_show(&current_filter);
-	if (current_filter.dbs & (1<<RAW_DB))
-		raw_show(&current_filter);
-	if (current_filter.dbs & (1<<UDP_DB))
-		udp_show(&current_filter);
-	if (current_filter.dbs & (1<<TCP_DB))
-		tcp_show(&current_filter);
-	if (current_filter.dbs & (1<<DCCP_DB))
-		dccp_show(&current_filter);
-	if (current_filter.dbs & (1<<SCTP_DB))
-		sctp_show(&current_filter);
-	if (current_filter.dbs & VSOCK_DBM)
-		vsock_show(&current_filter);
-	if (current_filter.dbs & (1<<TIPC_DB))
-		tipc_show(&current_filter);
-	if (current_filter.dbs & (1<<XDP_DB))
-		xdp_show(&current_filter);
+    while (1) {
+        if (current_filter.dbs & (1<<NETLINK_DB))
+            netlink_show(&current_filter);
+        if (current_filter.dbs & PACKET_DBM)
+            packet_show(&current_filter);
+        if (current_filter.dbs & UNIX_DBM)
+            unix_show(&current_filter);
+        if (current_filter.dbs & (1<<RAW_DB))
+            raw_show(&current_filter);
+        if (current_filter.dbs & (1<<UDP_DB))
+            udp_show(&current_filter);
+        if (current_filter.dbs & (1<<TCP_DB))
+            tcp_show(&current_filter);
+        if (current_filter.dbs & (1<<DCCP_DB))
+            dccp_show(&current_filter);
+        if (current_filter.dbs & (1<<SCTP_DB))
+            sctp_show(&current_filter);
+        if (current_filter.dbs & VSOCK_DBM)
+            vsock_show(&current_filter);
+        if (current_filter.dbs & (1<<TIPC_DB))
+            tipc_show(&current_filter);
+        if (current_filter.dbs & (1<<XDP_DB))
+            xdp_show(&current_filter);
 
-	if (show_users || show_proc_ctx || show_sock_ctx)
-		user_ent_destroy();
+        render();
 
-	render();
+        sleep(1);
+    }
+
+    if (show_users || show_proc_ctx || show_sock_ctx)
+        user_ent_destroy();
 
 	return 0;
 }
