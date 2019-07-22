@@ -1378,7 +1378,7 @@ static void sock_state_print(struct sockstat *s)
 		field_set(COL_NETID);
 		out("%s", sock_name);
 		field_set(COL_STATE);
-		out("{\"state\": \"%s\", ", sstate_name[s->state]);
+		out("\"state\": \"%s\", ", sstate_name[s->state]);
 	}
 
 	//field_set(COL_RECVQ);
@@ -2586,8 +2586,6 @@ static void tcp_stats_print(struct tcpstat *s)
 		out("\"notsent\": %u, ", s->not_sent);
 	if (s->min_rtt)
 		out("\"minrtt\": %g, ", s->min_rtt);
-
-    out("}\n");
 }
 
 static void tcp_timer_print(struct tcpstat *s)
@@ -3030,6 +3028,10 @@ static int inet_show_sock(struct nlmsghdr *nlh,
 	if (s->local.family == AF_INET6 && tb[INET_DIAG_SKV6ONLY])
 		v6only = rta_getattr_u8(tb[INET_DIAG_SKV6ONLY]);
 
+    out("{");
+
+    out("\"ts\": %lu, ", (unsigned long long)time(NULL));
+
 	inet_stats_print(s, v6only);
 
 	if (show_options) {
@@ -3075,6 +3077,8 @@ static int inet_show_sock(struct nlmsghdr *nlh,
 			tcp_show_info(nlh, r, tb);
 	}
 	sctp_ino = s->ino;
+
+    out("}\n");
 
 	return 0;
 }
