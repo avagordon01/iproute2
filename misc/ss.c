@@ -1427,7 +1427,8 @@ static int inet_show_sock(struct nlmsghdr *nlh,
 	}
 	sctp_ino = s->ino;
 
-    printf("}\n\n");
+    printf("}\n");
+    fflush(stdout);
 
 	return 0;
 }
