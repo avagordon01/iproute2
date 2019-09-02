@@ -1427,8 +1427,7 @@ static int inet_show_sock(struct nlmsghdr *nlh,
 	}
 	sctp_ino = s->ino;
 
-    printf("}\n");
-    fflush(stdout);
+    printf("}, ");
 
 	return 0;
 }
@@ -1684,7 +1683,10 @@ Exit:
 
 static int tcp_show(struct filter *f)
 {
+    printf("[");
     inet_show_netlink(f, NULL, IPPROTO_TCP);
+    printf("]\n");
+    fflush(stdout);
     return 0;
 }
 
